@@ -36,7 +36,6 @@ export const prefetchPrev = () => (dispatch, getState) => (
 export const loadNext = () => (dispatch, getState) => {
   const nextId = selectors.grading.next.submissionId(getState());
   return api.fetchSubmissionStatus(nextId).then((response) => {
-    console.log({ loadNext: response });
     dispatch(actions.grading.loadNext({ ...response, submissionId: nextId }));
     if (response.lockStatus === statuses.inProgress) {
       dispatch(module.startGrading());
