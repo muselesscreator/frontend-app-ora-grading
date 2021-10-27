@@ -51,3 +51,27 @@ export const mockComponents = (...args) => {
 
   return mockStructuredComponents(components, nestedComponents);
 };
+
+/**
+ * mapping = {
+ *   Button: 'Button',
+ *   DataTable: {
+ *     Body: 'DataTable.Body',
+ *   }
+ * }
+ */
+export const mockComponents2 = (mapping) => {
+  const mockedModule = {};
+  Object.keys(mapping).forEach(name => {
+    const isNested = typeof mapping[name] === 'object';
+    const value = isNested ? name : mapping[name];
+    mockedModule[name] = () => value;
+    Object.defineProperty(mockedModule[name], 'name', { value });
+    if (isNested) {
+      Object.keys(mapping[name]).forEach(subComponentName => {
+        mockedModule[name][subComponentName] = mapping[name][subComponentName];
+      });
+    }
+  });
+  return mockedModule;
+};
