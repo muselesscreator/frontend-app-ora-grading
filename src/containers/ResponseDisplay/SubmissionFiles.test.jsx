@@ -26,21 +26,21 @@ import { SubmissionFiles, HeaderEllipsesCell } from './SubmissionFiles';
 // });
 
 jest.mock('@edx/paragon', () => {
-  const { mockComponents2 } = jest.requireActual('testUtils');
-  return mockComponents2({
+  const { mockNestedComponent } = jest.requireActual('testUtils');
+  return {
     Card: 'Card',
-    Collapsible: {
+    Collapsible: mockNestedComponent('Collapsible', {
       Advanced: 'Collapsible.Advanced',
       Trigger: 'Collapsible.Trigger',
       Visible: 'Collapsible.Visible',
       Body: 'Collapsible.Body',
-    },
+    }),
     Button: 'Button',
     Icon: 'Icon',
-    DataTable: {
+    DataTable: mockNestedComponent('DataTable', {
       Table: 'DataTable.Table',
-    },
-  });
+    }),
+  };
 });
 
 jest.mock('@edx/paragon/icons', () => ({

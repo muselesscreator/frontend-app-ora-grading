@@ -75,3 +75,15 @@ export const mockComponents2 = (mapping) => {
   });
   return mockedModule;
 };
+
+/**
+ * mockNestedComponent('Card', { Body: 'Card.Body', ... });
+ */
+export const mockNestedComponent = (name, nestedComponents) => {
+  const fn = () => name;
+  Object.defineProperty(fn, 'name', { value: name });
+  Object.keys(nestedComponents).forEach(nestedName => {
+    fn[nestedName] = nestedComponents[nestedName];
+  });
+  return fn;
+};
