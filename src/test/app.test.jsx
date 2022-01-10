@@ -15,7 +15,7 @@ import { IntlProvider } from '@edx/frontend-platform/i18n';
 
 import urls from 'data/services/lms/urls';
 import { ErrorStatuses, RequestKeys, RequestStates } from 'data/constants/requests';
-import { lockStatuses } from 'data/services/lms/constants';
+import { gradeStatuses, lockStatuses } from 'data/services/lms/constants';
 import fakeData from 'data/services/lms/fakeData';
 import api from 'data/services/lms/api';
 import reducers from 'data/redux';
@@ -61,7 +61,7 @@ let retryLink;
 let find;
 let get;
 
-
+const { rubricConfig } = fakeData.oraMetadata;
 
 /**
  * Simple wrapper for updating the top-level state variable, that also returns the new value
@@ -132,6 +132,18 @@ const mockApi = () => {
       };
     },
   ));
+  api.updateGrade = jest.fn((uuid, gradeData) => new Promise(
+    (resolve, reject) => {
+      resolveFns.updateGrade = {
+        success: () => resolve({
+          gradeData,
+          gradeStatus: gradeStatuses.graded,
+          lockStatus: lockStatuses.unlocked,
+        }),
+        networkError: mockNetworkError(reject),
+      };
+    },
+  ));
 };
 
 /**
@@ -149,6 +161,7 @@ const renderEl = async () => {
   getState();
 };
 
+// collection of element-returning methods for grabbing UI elements
 class Inspector {
   listTable = () => el.getByRole('table');
   modal = () => el.getByRole('dialog');
@@ -156,7 +169,10 @@ class Inspector {
 
   listTable = () => el.getByRole('table');
   listTableRows = () => this.listTable().querySelectorAll('tbody tr');
-  listCheckbox = (index) => within(this.listTableRows().item(index)).getByTitle('Toggle Row Selected');
+  listCheckbox = (index) => (
+    within(this.listTableRows().item(index))
+      .getByTitle('Toggle Row Selected')
+  );
   listViewSelectedBtn = () => el.getByText('View selected responses (5)');
   nextNav = () => el.getByLabelText(appMessages.ReviewActionsComponents.loadNext);
   prevNav = () => el.getByLabelText(appMessages.ReviewActionsComponents.loadPrevious);
@@ -168,14 +184,37 @@ class Inspector {
   reviewGradingStatus = (submission) => (
     this.modalEl().getByText(appMessages.lms[gradingStatus(submission)])
   );
+
+  rubricCriteria = () => this.modal().querySelectorAll('.rubric-criteria');
+  criterionFeedback = () => this.modal().querySelectorAll('.criterion-feedback');
+  rubricFeedback = () => this.modal().querySelector('.rubric-feedback');
+
+  rubric = () => get.modalEl().getByText(appMessages.Rubric.rubric).closest('div');
+  rubricCriterion = (index) => (
+    within(this.rubric())
+      .getByText(rubricConfig.criteria[index].prompt).closest('div')
+  );
+  rubricOption = (criterionIndex, optionIndex) => (
+    within(this.rubricCriterion(criterionIndex))
+      .getByText(rubricConfig.criteria[criterionIndex].options[optionIndex].label)
+  );
+  rubricCriterionFeedback = (index) => within(this.rubricCriterion(index)).getByRole('textbox');
+  rubricFeedback = () => (
+    within(this.rubric()).getByText(appMessages.Rubric.overallComments).closest('div')
+  );
+  rubricFeedbackInput = () => within(this.rubricFeedback()).getByRole('textbox');
+  submitGradeBtn = () => this.modalEl().getByText(appMessages.Rubric.submitGrade);
 }
+
+// collection of Promise-returning methods for grabbing UI elements 
 class Finder {
   listViewAllResponsesBtn = () => el.findByText(appMessages.ListView.viewAllResponses);
   listLoadErrorHeading = () => el.findByText(appMessages.ListView.loadErrorHeading);
   prevNav = () => get.modalEl().findByLabelText(appMessages.ReviewActionsComponents.loadPrevious);
   reviewLoadErrorHeading = () => el.findByText(appMessages.ReviewErrors.loadErrorHeading);
+  startGradingBtn = () => el.findByText(appMessages.ReviewActionsComponents.startGrading);
+  submitGradeBtn = () => el.findByText(appMessages.Rubric.submitGrade);
 }
-
 
 /**
  * resolve the initalization promise, and update state object
@@ -220,191 +259,269 @@ const waitForRequestStatus = (key, status) => waitForEqual(
 const gradingStatus = ({ lockStatus, gradeStatus }) => (
   lockStatus === lockStatuses.unlocked ? gradeStatus : lockStatus
 );
+
 describe('ESG app integration tests', () => {
-  test('initialState', async () => {
+  beforeEach(async () => {
     mockApi();
     await renderEl();
     get = new Inspector();
     find = new Finder();
-    await waitForRequestStatus(RequestKeys.initialize, RequestStates.pending);
-    const testInitialState = (key) => expect(
-      state[key],
-      `${key} store should have its configured initial state`,
-    ).toEqual(
-      jest.requireActual(`data/redux/${key}/reducer`).initialState,
-    );
-    testInitialState('app');
-    testInitialState('submissions');
-    testInitialState('grading');
-    expect(
-      el.getByText(appMessages.ListView.loadingResponses),
-      'Loading Responses pending state text should be displayed in the ListView',
-    ).toBeVisible();
+  });
+
+  test('initialization', async (done) => {
+    const verifyInitialState = async () => {
+      await waitForRequestStatus(RequestKeys.initialize, RequestStates.pending);
+      const testInitialState = (key) => expect(
+        state[key],
+        `${key} store should have its configured initial state`,
+      ).toEqual(
+        jest.requireActual(`data/redux/${key}/reducer`).initialState,
+      );
+      testInitialState('app');
+      testInitialState('submissions');
+      testInitialState('grading');
+      expect(
+        el.getByText(appMessages.ListView.loadingResponses),
+        'Loading Responses pending state text should be displayed in the ListView',
+      ).toBeVisible();
+    }
+    await verifyInitialState();
 
     // initialization network error
-    resolveFns.init.networkError();
-    await waitForRequestStatus(RequestKeys.initialize, RequestStates.failed);
-    expect(
-      await find.listLoadErrorHeading(),
-      'List Error should be available (by heading component)',
-    ).toBeVisible();
-    const backLink = el.getByText(appMessages.ListView.backToResponsesLowercase).closest('a');
-    expect(
-      backLink.href,
-      'Back to responses button href should link to urls.openResponse(courseId)',
-    ).toEqual(urls.openResponse(getState().app.courseMetadata.courseId));
-    retryLink = el.getByText(appMessages.ListView.reloadSubmissions).closest('button');
+    const forceAndVerifyInitNetworkError = async () => {
+      resolveFns.init.networkError();
+      await waitForRequestStatus(RequestKeys.initialize, RequestStates.failed);
+      expect(
+        await find.listLoadErrorHeading(),
+        'List Error should be available (by heading component)',
+      ).toBeVisible();
+      const backLink = el.getByText(appMessages.ListView.backToResponsesLowercase).closest('a');
+      expect(
+        backLink.href,
+        'Back to responses button href should link to urls.openResponse(courseId)',
+      ).toEqual(urls.openResponse(getState().app.courseMetadata.courseId));
+    };
+    await forceAndVerifyInitNetworkError();
 
     // initialization retry/pending
+    retryLink = el.getByText(appMessages.ListView.reloadSubmissions).closest('button');
     await userEvent.click(retryLink);
     await waitForRequestStatus(RequestKeys.initialize, RequestStates.pending);
 
     // initialization success
-    await initialize();
-    await waitForRequestStatus(RequestKeys.initialize, RequestStates.completed);
-    expect(
-      state.app.courseMetadata,
-      'Course metadata in redux should be populated with fake data',
-    ).toEqual(fakeData.courseMetadata);
-    expect(
-      state.app.oraMetadata,
-      'ORA metadata in redux should be populated with fake data',
-    ).toEqual(fakeData.oraMetadata);
-    expect(
-      state.submissions.allSubmissions,
-      'submissions data in redux should be populated with fake data',
-    ).toEqual(fakeData.submissions);
-
-    // Table selection
-    await makeTableSelections();
-
-    // Review pending
-    await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.pending);
-    expect(
-      state.grading.selected,
-      'submission IDs should be loaded',
-    ).toEqual(submissionUUIDs);
-    // expect(get.modal(), 'ReviewModal should be visible').toBeVisible();
-    expect(state.app.showReview, 'app store should have showReview: true').toEqual(true);
-    expect(get.reviewUsername(0), 'username should be visible').toBeVisible();
-    expect(get.nextNav(), 'next nav should be displayed').toBeVisible();
-    expect(get.nextNav(), 'next nav should be disabled').toHaveAttribute('disabled');
-    expect(get.prevNav(), 'prev nav should be displayed').toBeVisible();
-    expect(get.prevNav(), 'prev nav should be disabled').toHaveAttribute('disabled');
-    expect(
-      get.reviewLoadingResponse(),
-      'Loading Responses pending state text should be displayed in the ReviewModal',
-    ).toBeVisible();
-
-    // Review: Fetch - Network Error
-    await resolveFns.fetch.networkError();
-    await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.failed);
-    expect(
-      await find.reviewLoadErrorHeading(),
-      'Load Submission error should be displayed in ReviewModal',
-    ).toBeVisible();
-    
-    // fetch: retry and succeed
-    await userEvent.click(get.reviewRetryLink());
-    await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.pending);
-
-    let showRubric = false;
-    // fetch: success
-    const verifyFetchSuccess = async (submissionIndex) => {
-      const submissionString = `for submission ${submissionIndex}`;
-      const submission = submissions[submissionIndex];
-      await resolveFns.fetch.success();
-
-      await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.completed);
+    const forceAndVerifyInitSuccess = async () => {
+      await initialize();
+      await waitForRequestStatus(RequestKeys.initialize, RequestStates.completed);
       expect(
-        get.reviewGradingStatus(submission),
-        `Should display current submission grading status ${submissionString}`,
-      ).toBeVisible();
-
-      showRubric = showRubric || selectors.grading.selected.isGrading(getState());
-      getState();
+        state.app.courseMetadata,
+        'Course metadata in redux should be populated with fake data',
+      ).toEqual(fakeData.courseMetadata);
       expect(
-        state.app.showRubric,
-        `${showRubric ? 'Should' : 'Should not'} show rubric ${submissionString}`,
-      ).toEqual(showRubric);
-      if (showRubric) {
-        expect(
-          el.getByText(appMessages.ReviewActions.hideRubric),
-          `Hide Rubric button should be visible when rubric is shown ${submissionString}`,
-        ).toBeVisible();
-
-      } else {
-        expect(
-          el.getByText(appMessages.ReviewActions.showRubric),
-          `Show Rubric button should be visible when rubric is hidden ${submissionString}`,
-        ).toBeVisible();
-      }
-
-      // loads current submission
+        state.app.oraMetadata,
+        'ORA metadata in redux should be populated with fake data',
+      ).toEqual(fakeData.oraMetadata);
       expect(
-        state.grading.current,
-        `Redux current grading state should load the current submission ${submissionString}`,
-      ).toEqual({
-        submissionUUID: submissionUUIDs[submissionIndex],
-        ...submissions[submissionIndex],
-      });
-      expect(get.nextNav(), `Next nav should be visible ${submissionString}`).toBeVisible();
-      expect(get.prevNav(), `Prev nav should be visible ${submissionString}`).toBeVisible();
-
-      if (submissionIndex > 0) {
-        expect(
-          get.prevNav(),
-          `Prev nav should be enabled ${submissionString}`,
-        ).not.toHaveAttribute('disabled');
-      } else {
-        expect(
-          get.prevNav(),
-          `Prev nav should be disabled ${submissionString}`,
-        ).toHaveAttribute('disabled');
-      }
-      if (submissionIndex < submissions.length - 1) {
-        expect(
-          get.nextNav(),
-          `Next nav should be enabled ${submissionString}`,
-        ).not.toHaveAttribute('disabled');
-      } else {
-        expect(
-          get.nextNav(),
-          `Next nav should be disabled ${submissionString}`,
-        ).toHaveAttribute('disabled');
-      }
+        state.submissions.allSubmissions,
+        'submissions data in redux should be populated with fake data',
+      ).toEqual(fakeData.submissions);
     };
-    await verifyFetchSuccess(0);
+    await forceAndVerifyInitSuccess();
 
-    await clickNext();
-    await verifyFetchSuccess(1);
-
-    await clickNext();
-    await verifyFetchSuccess(2);
-
-    await clickNext();
-    await verifyFetchSuccess(3);
-
-    await clickNext();
-    await verifyFetchSuccess(4);
-
-    await clickPrev();
-    await verifyFetchSuccess(3);
-
-    await clickNext();
-    await verifyFetchSuccess(4);
-
-    await clickPrev();
-    await verifyFetchSuccess(3);
-
-    await clickPrev();
-    await verifyFetchSuccess(2, true);
-
-    await clickPrev();
-    await verifyFetchSuccess(1);
-
-    await clickPrev();
-    await verifyFetchSuccess(0);
+    await makeTableSelections();
+    await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.pending);
     done();
+  });
+
+  describe('initialized', () => {
+    beforeEach(async () => {
+      await initialize();
+      await waitForRequestStatus(RequestKeys.initialize, RequestStates.completed);
+      await makeTableSelections();
+      await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.pending);
+    });
+
+    test('initial review state', async (done) => {
+      // Make table selection and load Review pane
+      expect(
+        state.grading.selected,
+        'submission IDs should be loaded',
+      ).toEqual(submissionUUIDs);
+      // expect(get.modal(), 'ReviewModal should be visible').toBeVisible();
+      expect(state.app.showReview, 'app store should have showReview: true').toEqual(true);
+      expect(get.reviewUsername(0), 'username should be visible').toBeVisible();
+      expect(get.nextNav(), 'next nav should be displayed').toBeVisible();
+      expect(get.nextNav(), 'next nav should be disabled').toHaveAttribute('disabled');
+      expect(get.prevNav(), 'prev nav should be displayed').toBeVisible();
+      expect(get.prevNav(), 'prev nav should be disabled').toHaveAttribute('disabled');
+      expect(
+        get.reviewLoadingResponse(),
+        'Loading Responses pending state text should be displayed in the ReviewModal',
+      ).toBeVisible();
+      done();
+    });
+
+    test('fetch network error and retry', async (done) => {
+      await resolveFns.fetch.networkError();
+      await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.failed);
+      expect(
+        await find.reviewLoadErrorHeading(),
+        'Load Submission error should be displayed in ReviewModal',
+      ).toBeVisible();
+      // fetch: retry and succeed
+      await userEvent.click(get.reviewRetryLink());
+      await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.pending);
+      done()
+    });
+
+    test('fetch success and nav chain', async (done) => {
+      let showRubric = false;
+      // fetch: success with chained navigation
+      const verifyFetchSuccess = async (submissionIndex) => {
+        const submissionString = `for submission ${submissionIndex}`;
+        const submission = submissions[submissionIndex];
+        const forceAndVerifyFetchSuccess = async () => {
+          await resolveFns.fetch.success();
+          await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.completed);
+          expect(
+            get.reviewGradingStatus(submission),
+            `Should display current submission grading status ${submissionString}`,
+          ).toBeVisible();
+        };
+        await forceAndVerifyFetchSuccess();
+
+        showRubric = showRubric || selectors.grading.selected.isGrading(getState());
+
+        const verifyRubricVisibility = async () => {
+          getState();
+          expect(
+            state.app.showRubric,
+            `${showRubric ? 'Should' : 'Should not'} show rubric ${submissionString}`,
+          ).toEqual(showRubric);
+          if (showRubric) {
+            expect(
+              el.getByText(appMessages.ReviewActions.hideRubric),
+              `Hide Rubric button should be visible when rubric is shown ${submissionString}`,
+            ).toBeVisible();
+
+          } else {
+            expect(
+              el.getByText(appMessages.ReviewActions.showRubric),
+              `Show Rubric button should be visible when rubric is hidden ${submissionString}`,
+            ).toBeVisible();
+          }
+        }
+        await verifyRubricVisibility();
+
+        // loads current submission
+        const testSubmissionGradingState = () => {
+          expect(
+            state.grading.current,
+            `Redux current grading state should load the current submission ${submissionString}`,
+          ).toEqual({
+            submissionUUID: submissionUUIDs[submissionIndex],
+            ...submissions[submissionIndex],
+          });
+        };
+        testSubmissionGradingState();
+
+        const testNavState = () => {
+          const expectDisabled = (getNav, name) => (
+             expect(getNav(), `${name} should be disabled`).toHaveAttribute('disabled')
+          );
+          const expectEnabled = (getNav, name) => (
+             expect(getNav(), `${name} should be enabled`).not.toHaveAttribute('disabled')
+          );
+
+          (submissionIndex > 0 ? expectEnabled : expectDisabled)(get.prevNav, 'Prev nav');
+          const hasNext = submissionIndex < submissions.length - 1;
+          (hasNext ? expectEnabled : expectDisabled)(get.nextNav, 'Next nav');
+        };
+        testNavState();
+      };
+      await verifyFetchSuccess(0);
+      for (let i = 1; i < 5; i++) {
+        await clickNext();
+        await verifyFetchSuccess(i);
+      }
+      for (let i = 3; i >= 0; i--) {
+        await clickPrev();
+        await verifyFetchSuccess(i);
+      }
+      done();
+    });
+
+    describe('grading (basic)', () => {
+      beforeEach(async () => {
+        await resolveFns.fetch.success();
+        await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.completed);
+        await userEvent.click(await find.startGradingBtn());
+      });
+      /*
+        test('pending', async (done) => {
+          done();
+        });
+        test('error', async (done) => {
+          done();
+        });
+      */
+      describe('active grading', () => {
+        beforeEach(async () => {
+          await resolveFns.lock.success();
+        });
+        const selectedOptions = [1, 2];
+        const feedback = ['feedback 0', 'feedback 1'];
+        const overallFeedback = 'some overall feedback';
+        const setGrade = async () => {
+          for (let i of [0, 1]) {
+            await userEvent.click(get.rubricOption(i, selectedOptions[i]));
+            await userEvent.type(get.rubricCriterionFeedback(i), feedback[i]);
+          }
+          await userEvent.type(get.rubricFeedbackInput(), overallFeedback);
+        };
+        const checkGradingState = () => {
+          const { gradingData } = getState().grading;
+          const entry = gradingData[submissionUUIDs[0]];
+          const checkCriteria = (index) => {
+            const criterion = entry.criteria[index];
+            const rubricOptions = rubricConfig.criteria[index].options;
+            expect(criterion.selectedOption).toEqual(rubricOptions[selectedOptions[index]].name);
+            expect(criterion.feedback).toEqual(feedback[index]);
+          }
+          [0, 1].forEach(checkCriteria);
+          expect(entry.overallFeedback).toEqual(overallFeedback);
+        }
+        const checkGradeSuccess = () => {
+          const { gradeData, current } = getState().grading;
+          const entry = gradeData[submissionUUIDs[0]];
+          const checkCriteria = (index) => {
+            const criterion = entry.criteria[index];
+            const rubricOptions = rubricConfig.criteria[index].options;
+            expect(criterion.selectedOption).toEqual(rubricOptions[selectedOptions[index]].name);
+            expect(criterion.feedback).toEqual(feedback[index]);
+          }
+          [0, 1].forEach(checkCriteria);
+          expect(entry.overallFeedback).toEqual(overallFeedback);
+          expect(current.gradeStatus).toEqual(gradeStatuses.graded);
+          expect(current.lockStatus).toEqual(lockStatuses.unlocked);
+        }
+        /*
+          test('submit pending', async (done) => {
+            done();
+          });
+          test('submit failed', async (done) => {
+            done();
+          });
+        */
+        test('submit grade (success)', async (done) => {
+          expect(await find.submitGradeBtn()).toBeVisible();
+          await setGrade();
+          checkGradingState();
+          await userEvent.click(get.submitGradeBtn());
+          await resolveFns.updateGrade.success();
+          checkGradeSuccess();
+          done();
+        });
+      });
+    });
   });
 });
