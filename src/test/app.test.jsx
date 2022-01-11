@@ -23,6 +23,7 @@ import messages from 'i18n';
 import { selectors } from 'data/redux';
 
 import App from 'App';
+import Inspector from './Inspector';
 import appMessages from './messages';
 
 jest.unmock('@edx/paragon');
@@ -58,8 +59,7 @@ let el;
 let store;
 let state;
 let retryLink;
-let find;
-let get;
+let inspector;
 
 const { rubricConfig } = fakeData.oraMetadata;
 
@@ -82,6 +82,9 @@ const submissionUUIDs = [
 ];
 const submissions = submissionUUIDs.map(id => fakeData.mockSubmission(id));
 
+/**
+ * Object to be filled with resolve/reject functions for all controlled network comm channels
+ */
 const resolveFns = {};
 /**
  * Mock the api with jest functions that can be tested against.
@@ -89,6 +92,7 @@ const resolveFns = {};
 const mockNetworkError = (reject) => () => reject(new Error({
   response: { status: ErrorStatuses.badRequest },
 }));
+
 const mockApi = () => {
   api.initializeApp = jest.fn(() => new Promise(
     (resolve, reject) => {
@@ -161,67 +165,12 @@ const renderEl = async () => {
   getState();
 };
 
-// collection of element-returning methods for grabbing UI elements
-class Inspector {
-  listTable = () => el.getByRole('table');
-  modal = () => el.getByRole('dialog');
-  modalEl = () => within(this.modal());
-
-  listTable = () => el.getByRole('table');
-  listTableRows = () => this.listTable().querySelectorAll('tbody tr');
-  listCheckbox = (index) => (
-    within(this.listTableRows().item(index))
-      .getByTitle('Toggle Row Selected')
-  );
-  listViewSelectedBtn = () => el.getByText('View selected responses (5)');
-  nextNav = () => el.getByLabelText(appMessages.ReviewActionsComponents.loadNext);
-  prevNav = () => el.getByLabelText(appMessages.ReviewActionsComponents.loadPrevious);
-  reviewUsername = (index) => this.modalEl().getByText(fakeData.ids.username(index));
-  reviewLoadingResponse = () => this.modalEl().getByText(appMessages.ReviewModal.loadingResponse);
-  reviewRetryLink = () => (
-    el.getByText(appMessages.ReviewErrors.reloadSubmission).closest('button')
-  );
-  reviewGradingStatus = (submission) => (
-    this.modalEl().getByText(appMessages.lms[gradingStatus(submission)])
-  );
-
-  rubricCriteria = () => this.modal().querySelectorAll('.rubric-criteria');
-  criterionFeedback = () => this.modal().querySelectorAll('.criterion-feedback');
-  rubricFeedback = () => this.modal().querySelector('.rubric-feedback');
-
-  rubric = () => get.modalEl().getByText(appMessages.Rubric.rubric).closest('div');
-  rubricCriterion = (index) => (
-    within(this.rubric())
-      .getByText(rubricConfig.criteria[index].prompt).closest('div')
-  );
-  rubricOption = (criterionIndex, optionIndex) => (
-    within(this.rubricCriterion(criterionIndex))
-      .getByText(rubricConfig.criteria[criterionIndex].options[optionIndex].label)
-  );
-  rubricCriterionFeedback = (index) => within(this.rubricCriterion(index)).getByRole('textbox');
-  rubricFeedback = () => (
-    within(this.rubric()).getByText(appMessages.Rubric.overallComments).closest('div')
-  );
-  rubricFeedbackInput = () => within(this.rubricFeedback()).getByRole('textbox');
-  submitGradeBtn = () => this.modalEl().getByText(appMessages.Rubric.submitGrade);
-}
-
-// collection of Promise-returning methods for grabbing UI elements 
-class Finder {
-  listViewAllResponsesBtn = () => el.findByText(appMessages.ListView.viewAllResponses);
-  listLoadErrorHeading = () => el.findByText(appMessages.ListView.loadErrorHeading);
-  prevNav = () => get.modalEl().findByLabelText(appMessages.ReviewActionsComponents.loadPrevious);
-  reviewLoadErrorHeading = () => el.findByText(appMessages.ReviewErrors.loadErrorHeading);
-  startGradingBtn = () => el.findByText(appMessages.ReviewActionsComponents.startGrading);
-  submitGradeBtn = () => el.findByText(appMessages.Rubric.submitGrade);
-}
-
 /**
  * resolve the initalization promise, and update state object
  */
 const initialize = async () => {
   resolveFns.init.success();
-  await find.listViewAllResponsesBtn();
+  await inspector.find.listView.viewAllResponsesBtn();
   getState();
 };
 
@@ -230,22 +179,16 @@ const initialize = async () => {
  * Wait for the review page to show and update the top-level state object.
  */
 const makeTableSelections = async () => {
-  [0, 1, 2, 3, 4].forEach(index => userEvent.click(get.listCheckbox(index)));
-  userEvent.click(get.listViewSelectedBtn());
+  [0, 1, 2, 3, 4].forEach(index => userEvent.click(inspector.listView.listCheckbox(index)));
+  userEvent.click(inspector.listView.selectedBtn());
   // wait for navigation, which will show while request is pending
   try {
-    await find.prevNav();
+    await inspector.find.review.prevNav();
   } catch (e) {
     throw(e);
   }
   getState();
 };
-
-// Click the 'next' button in review modal
-const clickNext = async () => { userEvent.click(get.nextNav()); };
-
-// Click the 'next' button in review modal
-const clickPrev = async () => { userEvent.click(get.prevNav()); };
 
 const waitForEqual = async (valFn, expected, key) => waitFor(() => {
   expect(valFn(), `${key} is expected to equal ${expected}`).toEqual(expected);
@@ -256,16 +199,11 @@ const waitForRequestStatus = (key, status) => waitForEqual(
   key,
 );
 
-const gradingStatus = ({ lockStatus, gradeStatus }) => (
-  lockStatus === lockStatuses.unlocked ? gradeStatus : lockStatus
-);
-
 describe('ESG app integration tests', () => {
   beforeEach(async () => {
     mockApi();
     await renderEl();
-    get = new Inspector();
-    find = new Finder();
+    inspector = new Inspector(el);
   });
 
   test('initialization', async (done) => {
@@ -281,7 +219,7 @@ describe('ESG app integration tests', () => {
       testInitialState('submissions');
       testInitialState('grading');
       expect(
-        el.getByText(appMessages.ListView.loadingResponses),
+        inspector.listView.loadingResponses(),
         'Loading Responses pending state text should be displayed in the ListView',
       ).toBeVisible();
     }
@@ -292,10 +230,10 @@ describe('ESG app integration tests', () => {
       resolveFns.init.networkError();
       await waitForRequestStatus(RequestKeys.initialize, RequestStates.failed);
       expect(
-        await find.listLoadErrorHeading(),
+        await inspector.find.listView.loadErrorHeading(),
         'List Error should be available (by heading component)',
       ).toBeVisible();
-      const backLink = el.getByText(appMessages.ListView.backToResponsesLowercase).closest('a');
+      const backLink = inspector.listView.backLink();
       expect(
         backLink.href,
         'Back to responses button href should link to urls.openResponse(courseId)',
@@ -304,7 +242,7 @@ describe('ESG app integration tests', () => {
     await forceAndVerifyInitNetworkError();
 
     // initialization retry/pending
-    retryLink = el.getByText(appMessages.ListView.reloadSubmissions).closest('button');
+    retryLink = inspector.listView.reloadBtn();
     await userEvent.click(retryLink);
     await waitForRequestStatus(RequestKeys.initialize, RequestStates.pending);
 
@@ -346,15 +284,16 @@ describe('ESG app integration tests', () => {
         state.grading.selected,
         'submission IDs should be loaded',
       ).toEqual(submissionUUIDs);
-      // expect(get.modal(), 'ReviewModal should be visible').toBeVisible();
       expect(state.app.showReview, 'app store should have showReview: true').toEqual(true);
-      expect(get.reviewUsername(0), 'username should be visible').toBeVisible();
-      expect(get.nextNav(), 'next nav should be displayed').toBeVisible();
-      expect(get.nextNav(), 'next nav should be disabled').toHaveAttribute('disabled');
-      expect(get.prevNav(), 'prev nav should be displayed').toBeVisible();
-      expect(get.prevNav(), 'prev nav should be disabled').toHaveAttribute('disabled');
+      expect(inspector.review.username(0), 'username should be visible').toBeVisible();
+      const nextNav = inspector.review.nextNav();
+      const prevNav = inspector.review.prevNav();
+      expect(nextNav, 'next nav should be displayed').toBeVisible();
+      expect(nextNav, 'next nav should be disabled').toHaveAttribute('disabled');
+      expect(prevNav, 'prev nav should be displayed').toBeVisible();
+      expect(prevNav, 'prev nav should be disabled').toHaveAttribute('disabled');
       expect(
-        get.reviewLoadingResponse(),
+        inspector.review.loadingResponse(),
         'Loading Responses pending state text should be displayed in the ReviewModal',
       ).toBeVisible();
       done();
@@ -364,11 +303,11 @@ describe('ESG app integration tests', () => {
       await resolveFns.fetch.networkError();
       await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.failed);
       expect(
-        await find.reviewLoadErrorHeading(),
+        await inspector.find.review.loadErrorHeading(),
         'Load Submission error should be displayed in ReviewModal',
       ).toBeVisible();
       // fetch: retry and succeed
-      await userEvent.click(get.reviewRetryLink());
+      await userEvent.click(inspector.review.retryFetchLink());
       await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.pending);
       done()
     });
@@ -383,7 +322,7 @@ describe('ESG app integration tests', () => {
           await resolveFns.fetch.success();
           await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.completed);
           expect(
-            get.reviewGradingStatus(submission),
+            inspector.review.gradingStatus(submission),
             `Should display current submission grading status ${submissionString}`,
           ).toBeVisible();
         };
@@ -399,13 +338,13 @@ describe('ESG app integration tests', () => {
           ).toEqual(showRubric);
           if (showRubric) {
             expect(
-              el.getByText(appMessages.ReviewActions.hideRubric),
+              inspector.review.hideRubricBtn(),
               `Hide Rubric button should be visible when rubric is shown ${submissionString}`,
             ).toBeVisible();
 
           } else {
             expect(
-              el.getByText(appMessages.ReviewActions.showRubric),
+              inspector.review.showRubricBtn(),
               `Show Rubric button should be visible when rubric is hidden ${submissionString}`,
             ).toBeVisible();
           }
@@ -431,20 +370,22 @@ describe('ESG app integration tests', () => {
           const expectEnabled = (getNav, name) => (
              expect(getNav(), `${name} should be enabled`).not.toHaveAttribute('disabled')
           );
-
-          (submissionIndex > 0 ? expectEnabled : expectDisabled)(get.prevNav, 'Prev nav');
+          (submissionIndex > 0 ? expectEnabled : expectDisabled)(
+            inspector.review.prevNav,
+            'Prev nav',
+          );
           const hasNext = submissionIndex < submissions.length - 1;
-          (hasNext ? expectEnabled : expectDisabled)(get.nextNav, 'Next nav');
+          (hasNext ? expectEnabled : expectDisabled)(inspector.review.nextNav, 'Next nav');
         };
         testNavState();
       };
       await verifyFetchSuccess(0);
       for (let i = 1; i < 5; i++) {
-        await clickNext();
+        await userEvent.click(inspector.review.nextNav());
         await verifyFetchSuccess(i);
       }
       for (let i = 3; i >= 0; i--) {
-        await clickPrev();
+        await userEvent.click(inspector.review.prevNav());
         await verifyFetchSuccess(i);
       }
       done();
@@ -454,7 +395,7 @@ describe('ESG app integration tests', () => {
       beforeEach(async () => {
         await resolveFns.fetch.success();
         await waitForRequestStatus(RequestKeys.fetchSubmission, RequestStates.completed);
-        await userEvent.click(await find.startGradingBtn());
+        await userEvent.click(await inspector.find.review.startGradingBtn());
       });
       /*
         test('pending', async (done) => {
@@ -471,13 +412,17 @@ describe('ESG app integration tests', () => {
         const selectedOptions = [1, 2];
         const feedback = ['feedback 0', 'feedback 1'];
         const overallFeedback = 'some overall feedback';
+
+        // Set basic grade and feedback
         const setGrade = async () => {
           for (let i of [0, 1]) {
-            await userEvent.click(get.rubricOption(i, selectedOptions[i]));
-            await userEvent.type(get.rubricCriterionFeedback(i), feedback[i]);
+            await userEvent.click(inspector.review.rubric.criterionOption(i, selectedOptions[i]));
+            await userEvent.type(inspector.review.rubric.criterionFeedback(i), feedback[i]);
           }
-          await userEvent.type(get.rubricFeedbackInput(), overallFeedback);
+          await userEvent.type(inspector.review.rubric.feedbackInput(), overallFeedback);
         };
+
+        // Verify active-grading state
         const checkGradingState = () => {
           const { gradingData } = getState().grading;
           const entry = gradingData[submissionUUIDs[0]];
@@ -490,6 +435,8 @@ describe('ESG app integration tests', () => {
           [0, 1].forEach(checkCriteria);
           expect(entry.overallFeedback).toEqual(overallFeedback);
         }
+
+        // Verify after-submission-success grade state
         const checkGradeSuccess = () => {
           const { gradeData, current } = getState().grading;
           const entry = gradeData[submissionUUIDs[0]];
@@ -513,10 +460,10 @@ describe('ESG app integration tests', () => {
           });
         */
         test('submit grade (success)', async (done) => {
-          expect(await find.submitGradeBtn()).toBeVisible();
+          expect(await inspector.find.review.submitGradeBtn()).toBeVisible();
           await setGrade();
           checkGradingState();
-          await userEvent.click(get.submitGradeBtn());
+          await userEvent.click(inspector.review.rubric.submitGradeBtn());
           await resolveFns.updateGrade.success();
           checkGradeSuccess();
           done();
