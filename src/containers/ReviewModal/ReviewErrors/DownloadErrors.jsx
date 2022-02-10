@@ -26,9 +26,10 @@ export class DownloadErrors extends React.Component {
 
   render() {
     if (!this.props.isFailed) { return null; }
+    console.log({ error: this.props.error });
     return (
       <ReviewError
-        key="lockFailed"
+        key="downloadFailed"
         headingMessage={messages.downloadFailedHeading}
         actions={{
           cancel: { onClick: this.cancelAction, message: messages.dismiss },
@@ -36,6 +37,13 @@ export class DownloadErrors extends React.Component {
         }}
       >
         <FormattedMessage {...messages.downloadFailedContent} />
+        <br />
+        <FormattedMessage {...messages.failedFiles} />
+        <ul>
+          {this.props.error.files.map(filename => (
+            <li key={filename}>{filename}</li>
+          ))}
+        </ul>
       </ReviewError>
     );
   }
@@ -43,12 +51,17 @@ export class DownloadErrors extends React.Component {
 DownloadErrors.propTypes = {
   // redux
   clearState: PropTypes.func.isRequired,
+  error: PropTypes.shape({
+    files: PropTypes.arrayOf(PropTypes.string),
+  }).isRequired,
   isFailed: PropTypes.bool.isRequired,
   downloadFiles: PropTypes.func.isRequired,
 };
 
+const requestKey = RequestKeys.downloadFiles;
 export const mapStateToProps = (state) => ({
-  isFailed: selectors.requests.isFailed(state, { requestKey: RequestKeys.downloadFiles }),
+  error: selectors.requests.error(state, { requestKey }),
+  isFailed: selectors.requests.isFailed(state, { requestKey }),
 });
 
 export const mapDispatchToProps = {

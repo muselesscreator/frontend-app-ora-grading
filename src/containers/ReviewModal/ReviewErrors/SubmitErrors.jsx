@@ -64,7 +64,7 @@ export class SubmitErrors extends React.Component {
         }}
         headingMessage={props.headingMessage}
       >
-        <FormattedMessage {...props.contentMessage} />
+        <p><FormattedMessage {...props.contentMessage} /></p>
       </ReviewError>
     );
   }

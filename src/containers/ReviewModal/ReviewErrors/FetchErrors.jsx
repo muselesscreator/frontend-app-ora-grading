@@ -28,7 +28,7 @@ export const FetchErrors = ({
     }}
     headingMessage={messages.loadErrorHeading}
   >
-    <FormattedMessage {...messages.loadErrorMessage} />
+    <p><FormattedMessage {...messages.loadErrorMessage} /></p>
   </ReviewError>
 );
 FetchErrors.defaultProps = {

@@ -37,7 +37,7 @@ export class LockErrors extends React.Component {
         key="lockFailed"
         headingMessage={heading}
       >
-        <FormattedMessage {...message} />
+        <p><FormattedMessage {...message} /></p>
       </ReviewError>
     );
   }

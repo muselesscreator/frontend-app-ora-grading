@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import { FileRenderer, isSupported } from 'components/FilePreview';
+import { FilePreview, isSupported } from 'components/FilePreview';
 
 /**
  * <PreviewDisplay />
@@ -9,7 +9,7 @@ import { FileRenderer, isSupported } from 'components/FilePreview';
 export const PreviewDisplay = ({ files }) => (
   <div className="preview-display">
     {files.filter(isSupported).map((file) => (
-      <FileRenderer key={file.name} file={file} />
+      <FilePreview key={file.name} file={file} />
     ))}
   </div>
 );

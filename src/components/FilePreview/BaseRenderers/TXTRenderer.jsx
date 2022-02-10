@@ -1,25 +1,34 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
-import { get } from 'axios';
+import { getTextFileContent } from 'data/services/download';
 
-const TXTRenderer = ({ url, onError, onSuccess }) => {
-  const [content, setContent] = useState('');
-  useMemo(() => {
-    get(url)
-      .then(({ data }) => {
-        onSuccess();
-        setContent(data);
-      })
-      .catch(({ response }) => onError(response.status));
-  }, [url]);
+export class TXTRenderer extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { content: '' };
+    this.onSuccess = this.onSuccess.bind(this);
+  }
 
-  return (
-    <pre className="txt-renderer">
-      {content}
-    </pre>
-  );
-};
+  componentDidMount() {
+    getTextFileContent(this.props.url, {
+      onSuccess: this.onSuccess,
+      onError: this.props.onError,
+    });
+  }
 
+  onSuccess(data) {
+    this.props.onSuccess();
+    this.setState({ content: data });
+  }
+
+  render() {
+    return (
+      <pre className="txt-renderer">
+        {this.state.content}
+      </pre>
+    );
+  }
+}
 TXTRenderer.defaultProps = {};
 
 TXTRenderer.propTypes = {

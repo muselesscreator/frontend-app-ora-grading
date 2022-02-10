@@ -17,33 +17,26 @@ const ReviewError = ({
   },
   headingMessage,
   children,
-}) => {
-  const actions = [];
-  if (cancel) {
-    actions.push((
-      <Button key="cancel" onClick={cancel.onClick} variant="outline-primary">
-        <FormattedMessage {...cancel.message} />
-      </Button>
-    ));
-  }
-  if (confirm) {
-    actions.push((
-      <Button key="confirm" onClick={confirm.onClick}>
-        <FormattedMessage {...confirm.message} />
-      </Button>
-    ));
-  }
-  return (
-    <Alert
-      variant="danger"
-      icon={Info}
-      actions={actions}
-    >
-      <Alert.Heading><FormattedMessage {...headingMessage} /></Alert.Heading>
-      <p>{children}</p>
-    </Alert>
-  );
-};
+}) => (
+  <Alert
+    variant="danger"
+    icon={Info}
+    {...(confirm && ({
+      actions: ([
+        <Button onClick={confirm.onClick}>
+          <FormattedMessage {...confirm.message} />
+        </Button>,
+      ]),
+    }))}
+    {...(cancel && ({
+      dismissible: true,
+      onClose: cancel.onClick,
+    }))}
+  >
+    <Alert.Heading><FormattedMessage {...headingMessage} /></Alert.Heading>
+    {children}
+  </Alert>
+);
 ReviewError.defaultProps = {
   actions: {},
 };

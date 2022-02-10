@@ -3,6 +3,7 @@ import FileSaver from 'file-saver';
 
 import { RequestKeys } from 'data/constants/requests';
 import { selectors } from 'data/redux';
+import { downloadFileBlobs } from 'data/services/download';
 
 import { networkRequest } from './requests';
 import * as module from './download';
@@ -40,21 +41,11 @@ export const zipFiles = (files, blobs) => {
   );
 };
 
-/**
- * Download a file and return its blob is successful, or null if not.
- * @param {obj} file - file entry with downloadUrl
- * @return {blob} - file blob or null
- */
-export const downloadFile = (file) => fetch(file.downloadUrl).then(resp => (
-  resp.ok ? resp.blob() : null
-));
+export const DownloadException = (files) => ({
+  files,
+  name: 'DownloadException',
+});
 
-/**
- * Download blobs given file objects.  Returns a promise map.
- * @param {obj[]} files - list of file entries with downloadUrl, name, and description
- * @return {Promise[]} - Promise map of download attempts (null for failed fetches)
- */
-export const downloadBlobs = (files) => Promise.all(files.map(module.downloadFile));
 
 /**
  * Download all files for the selected submission as a zip file.
@@ -64,9 +55,14 @@ export const downloadFiles = () => (dispatch, getState) => {
   const { files } = selectors.grading.selected.response(getState());
   dispatch(networkRequest({
     requestKey: RequestKeys.downloadFiles,
-    promise: module.downloadBlobs(files).then(blobs => {
+    promise: downloadFileBlobs(files).then(blobs => {
       if (blobs.some(blob => blob === null)) {
-        throw Error('Fetch Failed');
+        console.log({ blobs });
+        const failed = blobs
+          .map((blob, blobIndex) => ({ blob, blobIndex }))
+          .filter(({ blob }) => blob === null)
+          .map(({ blobIndex }) => files[blobIndex].name);
+        throw DownloadException(failed);
       }
       module.zipFiles(files, blobs);
     }),

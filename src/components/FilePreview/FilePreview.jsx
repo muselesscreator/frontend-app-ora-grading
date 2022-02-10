@@ -47,9 +47,9 @@ export const getFileType = (fileName) => fileName.split('.').pop()?.toLowerCase(
 export const isSupported = (file) => SUPPORTED_TYPES.includes(getFileType(file.name));
 
 /**
- * <FileRenderer />
+ * <FilePreview />
  */
-export class FileRenderer extends React.Component {
+export class FilePreview extends React.Component {
   constructor(props) {
     super(props);
 
@@ -119,12 +119,12 @@ export class FileRenderer extends React.Component {
   }
 }
 
-FileRenderer.defaultProps = {};
-FileRenderer.propTypes = {
+FilePreview.defaultProps = {};
+FilePreview.propTypes = {
   file: PropTypes.shape({
     name: PropTypes.string,
     downloadUrl: PropTypes.string,
   }).isRequired,
 };
 
-export default FileRenderer;
+export default FilePreview;

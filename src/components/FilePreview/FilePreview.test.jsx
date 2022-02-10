@@ -12,7 +12,7 @@ import {
   getFileType,
   ERROR_STATUSES,
   RENDERERS,
-} from './FileRenderer';
+} from './FilePreview';
 
 jest.mock('./FileCard', () => 'FileCard');
 

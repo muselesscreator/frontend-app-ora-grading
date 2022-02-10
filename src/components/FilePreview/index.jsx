@@ -1,1 +1,1 @@
-export { default as FileRenderer, isSupported } from './FileRenderer';
+export { default as FilePreview, isSupported } from './FilePreview';
