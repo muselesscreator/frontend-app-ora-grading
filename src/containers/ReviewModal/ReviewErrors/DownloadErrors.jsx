@@ -26,7 +26,6 @@ export class DownloadErrors extends React.Component {
 
   render() {
     if (!this.props.isFailed) { return null; }
-    console.log({ error: this.props.error });
     return (
       <ReviewError
         key="downloadFailed"

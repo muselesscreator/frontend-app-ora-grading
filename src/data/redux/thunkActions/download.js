@@ -46,7 +46,6 @@ export const DownloadException = (files) => ({
   name: 'DownloadException',
 });
 
-
 /**
  * Download all files for the selected submission as a zip file.
  * Throw error and do not download zip if any of the files fail to fetch.
@@ -57,7 +56,6 @@ export const downloadFiles = () => (dispatch, getState) => {
     requestKey: RequestKeys.downloadFiles,
     promise: downloadFileBlobs(files).then(blobs => {
       if (blobs.some(blob => blob === null)) {
-        console.log({ blobs });
         const failed = blobs
           .map((blob, blobIndex) => ({ blob, blobIndex }))
           .filter(({ blob }) => blob === null)

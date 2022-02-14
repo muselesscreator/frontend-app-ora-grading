@@ -2,11 +2,11 @@ import React from 'react';
 import { shallow } from 'enzyme';
 
 import { FileTypes } from 'data/constants/files';
-import { FileRenderer } from 'components/FilePreview';
+import { FilePreview } from 'components/FilePreview';
 import { PreviewDisplay } from './PreviewDisplay';
 
 jest.mock('components/FilePreview', () => ({
-  FileRenderer: () => 'FileRenderer',
+  FilePreview: () => 'FilePreview',
   isSupported: jest.requireActual('components/FilePreview').isSupported,
 }));
 
@@ -44,7 +44,7 @@ describe('PreviewDisplay', () => {
 
     describe('component', () => {
       test('only renders compatible files', () => {
-        const cards = el.find(FileRenderer);
+        const cards = el.find(FilePreview);
         expect(cards.length).toEqual(supportedTypes.length);
         cards.forEach((_, index) => {
           expect(

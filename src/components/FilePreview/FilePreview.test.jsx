@@ -8,7 +8,7 @@ import {
   TXTRenderer,
 } from 'components/FilePreview/BaseRenderers';
 import {
-  FileRenderer,
+  FilePreview,
   getFileType,
   ERROR_STATUSES,
   RENDERERS,
@@ -27,7 +27,7 @@ jest.mock('./Banners', () => ({
   LoadingBanner: () => 'LoadingBanner',
 }));
 
-describe('FileRenderer', () => {
+describe('FilePreview', () => {
   describe('component', () => {
     const supportedTypes = Object.keys(RENDERERS);
     const files = [
@@ -39,7 +39,7 @@ describe('FileRenderer', () => {
     ];
 
     const els = files.map((file) => {
-      const el = shallow(<FileRenderer file={file} />);
+      const el = shallow(<FilePreview file={file} />);
       el.instance().onError = jest.fn().mockName('this.props.onError');
       el.instance().onSuccess = jest.fn().mockName('this.props.onSuccess');
       return el;
@@ -58,7 +58,7 @@ describe('FileRenderer', () => {
 
       Object.keys(ERROR_STATUSES).forEach((status) => {
         test(`has error ${status}`, () => {
-          const el = shallow(<FileRenderer file={files[0]} />);
+          const el = shallow(<FilePreview file={files[0]} />);
           el.instance().setState({
             errorStatus: status,
             isLoading: false,
@@ -73,7 +73,7 @@ describe('FileRenderer', () => {
       describe('uses the correct renderers', () => {
         const checkFile = (index, expectedRenderer) => {
           const file = files[index];
-          const el = shallow(<FileRenderer file={file} />);
+          const el = shallow(<FilePreview file={file} />);
           const renderer = el.find(expectedRenderer);
           const { url, fileName } = renderer.props();
 
