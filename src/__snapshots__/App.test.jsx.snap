@@ -8,6 +8,7 @@ exports[`App router component snapshot 1`] = `
       courseOrg="course-org"
       courseTitle="course-title"
     />
+    <DemoBanner />
     <main>
       <ListView />
     </main>

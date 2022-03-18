@@ -50,6 +50,7 @@ exports[`ReviewActions component component snapshot: do not show rubric 1`] = `
       <SubmissionNavigation />
     </div>
   </ActionRow>
+  <DemoBanner />
 </div>
 `;
 
@@ -92,6 +93,7 @@ exports[`ReviewActions component component snapshot: loading 1`] = `
       <SubmissionNavigation />
     </div>
   </ActionRow>
+  <DemoBanner />
 </div>
 `;
 
@@ -133,5 +135,6 @@ exports[`ReviewActions component component snapshot: show rubric, no score 1`] =
       <SubmissionNavigation />
     </div>
   </ActionRow>
+  <DemoBanner />
 </div>
 `;

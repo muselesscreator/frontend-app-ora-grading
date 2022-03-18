@@ -19,6 +19,7 @@ jest.mock('data/redux/grading/selectors', () => ({
 jest.mock('data/redux/requests/selectors', () => ({
   isCompleted: (state) => ({ isCompleted: state }),
 }));
+jest.mock('components/DemoBanner', () => 'DemoBanner');
 jest.mock('components/StatusBadge', () => 'StatusBadge');
 jest.mock('./components/StartGradingButton', () => 'StartGradingButton');
 jest.mock('./components/SubmissionNavigation', () => 'SubmissionNavigation');

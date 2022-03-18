@@ -8,6 +8,7 @@ import ListView from 'containers/ListView';
 import { App } from './App';
 
 jest.mock('@edx/frontend-component-footer', () => 'Footer');
+jest.mock('components/DemoBanner', () => 'DemoBanner');
 jest.mock('containers/ListView', () => 'ListView');
 jest.mock('containers/CourseHeader', () => 'CourseHeader');
 

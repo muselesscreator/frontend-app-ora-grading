@@ -8,6 +8,7 @@ import { FormattedMessage } from '@edx/frontend-platform/i18n';
 import { actions, selectors } from 'data/redux';
 import { RequestKeys } from 'data/constants/requests';
 
+import DemoBanner from 'components/DemoBanner';
 import StatusBadge from 'components/StatusBadge';
 import StartGradingButton from './components/StartGradingButton';
 import SubmissionNavigation from './components/SubmissionNavigation';
@@ -51,6 +52,7 @@ export const ReviewActions = ({
         <SubmissionNavigation />
       </div>
     </ActionRow>
+    <DemoBanner />
   </div>
 );
 ReviewActions.defaultProps = {
