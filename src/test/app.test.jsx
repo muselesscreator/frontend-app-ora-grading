@@ -29,6 +29,7 @@ import appMessages from './messages';
 jest.unmock('@edx/paragon');
 jest.unmock('@edx/paragon/icons');
 jest.unmock('@edx/frontend-platform/i18n');
+jest.unmock('react');
 
 jest.mock('@edx/frontend-platform/auth', () => ({
   getAuthenticatedHttpClient: jest.fn(),
